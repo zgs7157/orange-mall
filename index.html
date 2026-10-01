@@ -51,6 +51,8 @@ a{color:inherit;text-decoration:none}
 .cart-btn{position:relative;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border:1px solid var(--line);border-radius:10px;background:#fff;transition:border .15s,color .15s}
 .cart-btn:hover{border-color:var(--brand);color:var(--brand)}
 .cart-btn svg{width:20px;height:20px}
+.admin-link{font-size:13px;color:var(--muted);padding:6px 10px;border-radius:8px;transition:color .15s,background .15s}
+.admin-link:hover{color:var(--brand);background:var(--brand-soft)}
 .cart-badge{position:absolute;top:-6px;right:-6px;min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:var(--brand);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;transition:transform .15s}
 .cart-badge.hide{display:none}
 
@@ -243,6 +245,7 @@ a{color:inherit;text-decoration:none}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1.4"/><circle cx="19" cy="21" r="1.4"/><path d="M2.5 3h2l2.6 12.4a2 2 0 0 0 2 1.6h8.7a2 2 0 0 0 2-1.6L21.5 7H6"/></svg>
         <span class="cart-badge hide" id="cartBadge">0</span>
       </button>
+      <a class="admin-link" href="admin.html" aria-label="进入管理后台">管理</a>
     </div>
   </div>
 </header>
@@ -396,7 +399,8 @@ a{color:inherit;text-decoration:none}
 
 <script>
 /* ===== 数据 ===== */
-const PRODUCTS = [
+/* 内置演示数据：仅在后端 API 不可用（断网/数据库未配置）时回退使用 */
+const FALLBACK_PRODUCTS = [
   {id:1, name:"轻羽降噪耳机 Pro", cat:"digital", catName:"数码", price:399, rating:4.9, isNew:true,
    img:"assets/p01-earbuds.jpg", desc:"入耳式主动降噪，通勤地铁一秒安静。",
    feats:["-43dB 混合主动降噪，通透模式一键切换","单次续航 8 小时，配合充电仓共 30 小时","蓝牙 5.3 低延迟，支持双设备连接"]},
@@ -422,6 +426,9 @@ const PRODUCTS = [
    img:"assets/p08-organizer.jpg", desc:"实木三层，桌面杂物各归其位。",
    feats:["三层实木搁板 + 金属支架，稳固承重","免安装设计，开箱即用","原木纹理，适配多种家居风格"]}
 ];
+
+/* 商品数据：默认回退到内置数据，页面加载后尝试从后端 API 拉取覆盖 */
+let PRODUCTS = FALLBACK_PRODUCTS;
 const CATS = {all:"全部", digital:"数码", life:"生活好物", new:"新品"};
 
 /* ===== 状态 ===== */
@@ -455,6 +462,7 @@ function toast(msg){
 function visibleProducts(){
   const q = query.trim().toLowerCase();
   return PRODUCTS.filter(p => {
+    if (p.on_sale === false) return false;
     if (filter === "new" && !p.isNew) return false;
     if (filter !== "all" && filter !== "new" && p.cat !== filter) return false;
     if (q && !(p.name.toLowerCase().includes(q) || p.catName.includes(query.trim()))) return false;
@@ -630,6 +638,29 @@ document.addEventListener("keydown", e => { if (e.key === "Escape"){ closeModal(
 /* ===== 启动 ===== */
 renderGrid();
 renderCart();
+
+/* 从后端 API 加载商品；失败时保留内置演示数据 */
+async function loadProducts(){
+  try{
+    const res = await fetch("/api/products", { headers: { Accept: "application/json" } });
+    if (!res.ok) throw new Error("API " + res.status);
+    const data = await res.json();
+    if (data.ok && Array.isArray(data.products) && data.products.length){
+      PRODUCTS = data.products.map(p => ({
+        id: p.id, name: p.name, cat: p.category, catName: p.catName,
+        price: p.price, rating: p.rating, isNew: !!p.isNew,
+        img: p.image || "assets/hero.jpg", desc: p.description || "",
+        feats: Array.isArray(p.feats) ? p.feats : [],
+        on_sale: !!p.on_sale
+      }));
+      renderGrid();
+      renderCart();
+    }
+  }catch(e){
+    /* API 不可用时保持内置演示数据 */
+  }
+}
+loadProducts();
 </script>
 </body>
 </html>
